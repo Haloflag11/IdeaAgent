@@ -73,3 +73,6 @@ htmlcov/
 CONFIG_REVIEW.md
 CODE_REVIEW.md
 PROJECT_SUMMARY.md
+
+#uv
+uv.lock
