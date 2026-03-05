@@ -10,6 +10,7 @@ from dotenv import load_dotenv, find_dotenv
 
 from .models import ExperimentPlan, ExperimentStep, ResearchType
 from . import prompts
+from .context import ContextManager
 
 # Force load from .env file, overriding system environment variables
 env_path = find_dotenv()
@@ -333,3 +334,271 @@ class LLMClient:
             estimated_total_time=plan_data.get("estimated_total_time"),
             skills_needed=plan_data.get("skills_needed", []),
         )
+
+    # ------------------------------------------------------------------
+    # Context-aware execution methods (using ContextManager)
+    # ------------------------------------------------------------------
+
+    def execute_step_with_context(
+        self,
+        context_manager: ContextManager,
+        step_description: str,
+        skill_instructions: Optional[str] = None,
+        available_tools: Optional[list] = None,
+    ) -> str:
+        """Generate executable code using ContextManager for context.
+        
+        This method uses the ContextManager to build the complete context,
+        ensuring that the initial instruction and workspace information
+        are always included in the LLM context.
+        
+        Args:
+            context_manager: The ContextManager instance containing persistent context
+            step_description: Description of the step to execute
+            skill_instructions: Optional skill documentation
+            available_tools: Optional list of available MCP tools
+            
+        Returns:
+            Generated response string from LLM
+        """
+        # Build user prompt with step description and skill instructions
+        user_prompt_parts = [
+            "== CURRENT STEP TO EXECUTE ==",
+            step_description,
+            "",
+            "== REQUIREMENTS ==",
+            "1. Use action tags to perform tasks: <bash>, <python>, <write_file>, <read_file>, <mkdir>, <thinking>",
+            "2. Create a well-structured project with multiple module files",
+            "3. Follow the workspace layout guidelines above",
+            "4. Reference files from USER WORKSPACE CONTEXT if applicable",
+            "5. Use ASCII-only characters in print() statements",
+        ]
+        
+        if skill_instructions:
+            user_prompt_parts.extend(["", "== SKILL INSTRUCTIONS ==", skill_instructions])
+        
+        user_prompt_parts.extend(["", "Generate actions now:"])
+        user_prompt = "\n".join(user_prompt_parts)
+        
+        # Get system prompt
+        from .models import ResearchType
+        if available_tools:
+            system_prompt = prompts.get_execution_system_prompt_with_tools(
+                context_manager.persistent.research_type, available_tools
+            )
+        else:
+            system_prompt = prompts.get_execution_system_prompt(
+                context_manager.persistent.research_type
+            )
+        
+        # Get messages with full context
+        messages = context_manager.get_messages_for_llm(system_prompt, user_prompt)
+        
+        # Call LLM
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            logger.error(f"execute_step_with_context failed: {e}")
+            return f"# Error generating code: {e}"
+
+    def judge_and_fix_with_context(
+        self,
+        context_manager: ContextManager,
+        step_description: str,
+        code: str,
+        stdout: str,
+        stderr: str,
+        returncode: int,
+        skill_instructions: Optional[str] = None,
+        attempt: int = 1,
+        max_attempts: int = 5,
+    ) -> dict:
+        """Let the LLM judge execution using ContextManager for context.
+        
+        This method uses the ContextManager to build the complete context,
+        ensuring that the initial instruction and workspace information
+        are always included when judging execution results.
+        
+        Args:
+            context_manager: The ContextManager instance containing persistent context
+            step_description: Description of the step
+            code: The code/actions that were executed
+            stdout: stdout from execution
+            stderr: stderr from execution
+            returncode: Return code from execution
+            skill_instructions: Optional skill documentation
+            attempt: Current attempt number
+            max_attempts: Maximum number of attempts
+            
+        Returns:
+            Dict with status ("success" or "fix") and optional reason/code
+        """
+        # Build user prompt for judgment
+        stdout_trunc = stdout[:4000] if len(stdout) > 4000 else stdout
+        stderr_trunc = stderr[:2000] if len(stderr) > 2000 else stderr
+        
+        user_prompt_parts = [
+            f"You are acting as an autonomous agent executor (attempt {attempt}/{max_attempts}).",
+            "",
+            "You just executed the following actions for this step:",
+            "",
+            "== STEP ==",
+            step_description,
+            "",
+            "== ACTIONS THAT WERE EXECUTED ==",
+            code,
+            "",
+            "== EXECUTION RESULT ==",
+            f"Return code: {returncode}",
+            "",
+            "--- stdout ---",
+            stdout_trunc,
+            "",
+            "--- stderr ---",
+            stderr_trunc,
+            "",
+            "== YOUR JOB ==",
+            "Read ALL of the output above carefully.",
+            "",
+            "If the step completed successfully (ran without errors and produced expected outputs):",
+            '  Respond with ONLY this JSON (no other text):',
+            '  {"status": "success"}',
+            "",
+            "If there are ANY errors, exceptions, logical failures, or wrong/incomplete output:",
+            '  Diagnose the root cause, then respond with ONLY this JSON (no markdown):',
+            '  {"status": "fix", "reason": "<brief diagnosis>", ',
+            '"code": "<complete corrected actions with action tags>"}',
+            "",
+            'The "code" field must contain the ENTIRE corrected response with action tags (not a diff).',
+            "Use action tags: <bash>, <python>, <write_file>, <read_file>, <mkdir>, <thinking>",
+            "All code MUST follow encoding rules (ASCII-only in print()).",
+        ]
+        
+        if skill_instructions:
+            user_prompt_parts.extend(["", "== SKILL INSTRUCTIONS ==", skill_instructions])
+        
+        user_prompt = "\n".join(user_prompt_parts)
+        
+        # Get system prompt
+        system_prompt = prompts.get_execution_system_prompt(
+            context_manager.persistent.research_type
+        )
+        
+        # Get messages with full context
+        messages = context_manager.get_messages_for_llm(system_prompt, user_prompt)
+        
+        # Call LLM
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.2,
+                max_tokens=self.max_tokens,
+                response_format={"type": "json_object"},
+            )
+            content = response.choices[0].message.content or ""
+            logger.info("judge_and_fix_with_context attempt %d/%d returned %d chars", 
+                       attempt, max_attempts, len(content))
+            result = json.loads(content)
+            if result.get("status") not in ("success", "fix"):
+                logger.warning("Unexpected judge_and_fix_with_context status: %s", result)
+                return {"status": "success"}
+            return result
+        except Exception as exc:
+            logger.error("judge_and_fix_with_context LLM call failed: %s", exc)
+            return {
+                "status": "success" if returncode == 0 else "fix",
+                "reason": str(exc),
+                "code": code,
+            }
+
+    def stream_execute_step_with_context(
+        self,
+        context_manager: ContextManager,
+        step_description: str,
+        skill_instructions: Optional[str] = None,
+        callback: Optional[callable] = None,
+    ) -> tuple[str, str]:
+        """Stream step execution with context manager and real-time thinking output.
+        
+        This method uses the ContextManager to build the complete context,
+        ensuring that the initial instruction and workspace information
+        are always included.
+        
+        Args:
+            context_manager: The ContextManager instance containing persistent context
+            step_description: Description of the current step
+            skill_instructions: Optional skill documentation
+            callback: Called for each incoming thinking chunk
+                Signature: callback(chunk_type: str, content: str)
+                
+        Returns:
+            (full_response_text, extracted_code)
+        """
+        from .utils.stream_parser import extract_python_code
+        
+        # Build user prompt
+        user_prompt_parts = [
+            "== CURRENT STEP TO EXECUTE ==",
+            step_description,
+            "",
+            "== REQUIREMENTS ==",
+            "1. Use action tags to perform tasks",
+            "2. Follow the workspace layout guidelines",
+            "3. Reference files from USER WORKSPACE CONTEXT if applicable",
+            "4. Use ASCII-only characters in print() statements",
+        ]
+        
+        if skill_instructions:
+            user_prompt_parts.extend(["", "== SKILL INSTRUCTIONS ==", skill_instructions])
+        
+        user_prompt_parts.extend(["", "Generate actions now:"])
+        user_prompt = "\n".join(user_prompt_parts)
+        
+        # Get system prompt
+        system_prompt = prompts.get_execution_system_prompt(
+            context_manager.persistent.research_type
+        )
+        
+        # Get messages with full context
+        messages = context_manager.get_messages_for_llm(system_prompt, user_prompt)
+        
+        # Call LLM with streaming
+        stream = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            stream=True,
+        )
+        
+        full_response: list[str] = []
+        
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            
+            # Regular content
+            content = getattr(delta, "content", None) or ""
+            if content:
+                full_response.append(content)
+            
+            # Reasoning / thinking fields
+            delta_dict = delta.model_dump() if hasattr(delta, "model_dump") else (
+                delta.dict() if hasattr(delta, "dict") else {}
+            )
+            for field in ("reasoning_content", "thinking", "reasoning"):
+                thinking = delta_dict.get(field)
+                if thinking and callback:
+                    callback("thinking", thinking)
+                    break
+        
+        full_text = "".join(full_response)
+        return full_text, extract_python_code(full_text)

@@ -51,6 +51,7 @@ logs/
 # Workspace files
 sandbox_workspaces/
 user_workspaces/ultralytics/
+ultralytics/
 
 
 # MCP configuration (may contain secrets)

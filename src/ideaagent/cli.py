@@ -604,7 +604,7 @@ class IdeaAgentCLI:
     async def _execute_step_with_agent_loop(
         self,
         step,
-        full_context: str,
+        context_manager: "ContextManager",
         skill_instructions: Optional[str],
         workspace_dir: Path,
         installed_packages: list[str],
@@ -622,7 +622,7 @@ class IdeaAgentCLI:
 
         Args:
             step: ExperimentStep to execute.
-            full_context: Rich context string (workspace + history).
+            context_manager: ContextManager instance containing persistent context.
             skill_instructions: Full SKILL.md text if a skill is required.
             workspace_dir: Task workspace directory.
             installed_packages: Mutable list tracking packages installed so far.
@@ -661,7 +661,10 @@ class IdeaAgentCLI:
 
             # ── 1. First iteration: generate fresh response ──────────────────
             if iteration == 1:
-                use_streaming = hasattr(self.llm, 'stream_execute_step_with_thinking')
+                # Update context manager with current step
+                context_manager.set_current_step(step.step_number, 0)  # total_steps will be set externally
+                
+                use_streaming = hasattr(self.llm, 'stream_execute_step_with_context')
                 
                 if use_streaming:
                     self.console.print(
@@ -671,10 +674,9 @@ class IdeaAgentCLI:
                     thinking_cb = self._thinking_callback_factory(step.step_number, iteration)
                     
                     self.console.print("\n[bold yellow]Streaming thinking output:[/bold yellow]")
-                    raw_response, _ = self.llm.stream_execute_step_with_thinking(
-                        research_type, 
+                    raw_response, _ = self.llm.stream_execute_step_with_context(
+                        context_manager,
                         step.description, 
-                        full_context, 
                         skill_instructions,
                         callback=thinking_cb,
                     )
@@ -687,8 +689,10 @@ class IdeaAgentCLI:
                         console=self.console,
                     ) as progress:
                         t = progress.add_task("[cyan]Generating response...", total=None)
-                        raw_response = self.llm.execute_step(
-                            research_type, step.description, full_context, skill_instructions,
+                        raw_response = self.llm.execute_step_with_context(
+                            context_manager,
+                            step.description,
+                            skill_instructions,
                         )
                         progress.update(t, completed=True)
 
@@ -750,7 +754,7 @@ class IdeaAgentCLI:
                             path = action.content
                             result = file_manager.read_file(path)
                             if result["success"]:
-                                content_preview = result["content"][:200] + "..." if len(result["content"]) > 200 else result["content"]
+                                content_preview = result["content"][:20] + "..." if len(result["content"]) > 200 else result["content"]
                                 self.console.print(f"    [green]Read {path} ({result['bytes_read']} bytes)[/green]")
                                 action_outputs.append(f"[READ_FILE OK] {path}:\n{content_preview}")
                             else:
@@ -824,14 +828,13 @@ class IdeaAgentCLI:
                 console=self.console,
             ) as progress:
                 t = progress.add_task("[cyan]LLM judging...", total=None)
-                judgment = self.llm.judge_and_fix(
-                    research_type=research_type,
+                judgment = self.llm.judge_and_fix_with_context(
+                    context_manager=context_manager,
                     step_description=step.description,
                     code=raw_response,
                     stdout=last_output,
                     stderr=last_error,
                     returncode=last_returncode,
-                    context=full_context,
                     skill_instructions=skill_instructions,
                     attempt=iteration,
                     max_attempts=max_iterations,
@@ -950,14 +953,17 @@ class IdeaAgentCLI:
         idea: str,
         effective_workspace: Optional[Path] = None,
     ) -> None:
-        """Execute the approved plan step by step.
+        """Execute the approved plan step by step using ContextManager.
 
-        This is the main execution loop.  For each step it:
-        1. Loads optional skill instructions.
-        2. Builds a rich context (workspace structure + history + environment).
+        This is the main execution loop. For each step it:
+        1. Creates/updates the ContextManager with persistent context
+        2. Loads optional skill instructions.
         3. Calls :meth:`_execute_step_with_agent_loop` which runs the inner
            agent loop (generate → validate → execute → fix & retry).
         4. Records the result and persists the task state.
+
+        The ContextManager ensures that the initial instruction and workspace
+        information are always present in the LLM context throughout execution.
 
         Args:
             state_manager: :class:`~ideaagent.state.TaskStateManager` for the
@@ -971,7 +977,7 @@ class IdeaAgentCLI:
         """
         import time
         from .models import ExecutionResult
-        from .utils.workspace import build_rich_context
+        from .context import ContextManager
 
         logger.info("Starting execution of plan with %d steps", len(plan.steps))
 
@@ -997,8 +1003,17 @@ class IdeaAgentCLI:
             f"\n[bold green]📁 Task Workspace:[/bold green] [dim]{workspace_dir}[/dim]"
         )
 
+        # ── Create ContextManager with persistent context ───────────────────
+        # This is the key change: ContextManager ensures initial instruction
+        # and workspace info are ALWAYS in the LLM context
+        context_manager = ContextManager(
+            initial_instruction=idea,
+            workspace_dir=workspace_dir,
+            research_type=state_manager.task.research_type,
+            user_workspace_path=effective_workspace,
+        )
+
         # Running state
-        execution_context: list[dict] = []
         installed_packages: list[str] = []
 
         for step in plan.steps:
@@ -1018,7 +1033,7 @@ class IdeaAgentCLI:
             )
             self.console.print(f"  [bold white]{step.description}[/bold white]")
 
-            # ── Skill loading (Issue 2.1 fix) ─────────────────────────────
+            # ── Skill loading ───────────────────────────────────────────────
             skill_instructions: Optional[str] = None
             if step.skill_required:
                 logger.info("Using skill: %s", step.skill_required)
@@ -1067,14 +1082,8 @@ class IdeaAgentCLI:
                         "continuing without it.[/yellow]"
                     )
 
-            # ── Rich context building (Issue 3.1 fix) ─────────────────────
-            full_context = build_rich_context(
-                workspace_dir=workspace_dir,
-                execution_context=execution_context,
-                current_step=step.step_number,
-                installed_packages=installed_packages,
-                user_workspace_path=effective_workspace,
-            )
+            # ── Update context manager with current step ───────────────────
+            context_manager.set_current_step(step.step_number, len(plan.steps))
 
             self.console.print(
                 "\n[bold yellow]📞 Calling LLM for execution instructions...[/bold yellow]"
@@ -1091,11 +1100,11 @@ class IdeaAgentCLI:
                         False, "", "LLM client not initialized", ""
                     )
                 else:
-                    # ── Agent loop (Issue 1.1 fix) ─────────────────────────
+                    # ── Agent loop with ContextManager ─────────────────────
                     success, output, error, final_code = (
                         await self._execute_step_with_agent_loop(
                             step=step,
-                            full_context=full_context,
+                            context_manager=context_manager,
                             skill_instructions=skill_instructions,
                             workspace_dir=workspace_dir,
                             installed_packages=installed_packages,
@@ -1120,23 +1129,14 @@ class IdeaAgentCLI:
             state_manager.add_execution_result(result)
             self.db.save_task(state_manager.task)
 
-            # ── Update execution context for next step (Issue 3.1 fix) ─────
-            execution_context.append(
-                {
-                    "step_number": step.step_number,
-                    "description": step.description,
-                    "success": success,
-                    "output": output,
-                    "error": error,
-                    "packages_installed": list(installed_packages),
-                    "files_created": [
-                        str(p.name)
-                        for p in workspace_dir.iterdir()
-                        if p.is_file() and p.name != "script.py"
-                    ]
-                    if workspace_dir.exists()
-                    else [],
-                }
+            # ── Update context manager with execution result ───────────────
+            context_manager.add_execution_result(
+                step_number=step.step_number,
+                description=step.description,
+                success=success,
+                output=output,
+                error=error,
+                packages_installed=list(installed_packages) if success else None,
             )
 
             # ── Step summary ─────────────────────────────────────────────────
@@ -1166,10 +1166,6 @@ class IdeaAgentCLI:
 
         # ── Task completion ──────────────────────────────────────────────────
         if state_manager.task.status.value == "running":
-            # Only mark completed when EVERY planned step actually succeeded.
-            # A step failure causes an early `break`, so either
-            # execution_results is shorter than plan.steps, or its last entry
-            # has success=False.
             all_succeeded = (
                 len(state_manager.task.execution_results) == len(plan.steps)
                 and all(r.success for r in state_manager.task.execution_results)

@@ -12,6 +12,7 @@ from .models import (
 )
 from .database import Database
 from .state import TaskStateManager
+from .context import ContextManager, PersistentContext
 
 __all__ = [
     "ResearchType",
@@ -21,4 +22,6 @@ __all__ = [
     "ExecutionResult",
     "Database",
     "TaskStateManager",
+    "ContextManager",
+    "PersistentContext",
 ]
