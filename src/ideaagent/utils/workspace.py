@@ -111,10 +111,12 @@ def build_rich_context(
     current_step: int,
     installed_packages: Optional[list[str]] = None,
     user_workspace_path: Optional[Path] = None,
+    constant_context: Optional[str] = None,
 ) -> str:
     """Build a comprehensive context dict string for the LLM.
 
     Combines:
+    - Constant context (initial instruction + workspace, if provided)
     - User workspace RAG context (if a user workspace is specified)
     - Workspace directory structure
     - Previous step history (with outputs, errors, installed packages)
@@ -129,13 +131,20 @@ def build_rich_context(
             directory.  When provided, all readable files in that directory
             are scanned and their content is injected as AgenticRAG context
             so the Agent can reference existing data, code, and notes.
+        constant_context: Optional constant context string from ContextManager.
+            This ensures initial instruction and workspace path are always
+            included in every LLM call.
 
     Returns:
         Formatted multi-section context string.
     """
     sections: list[str] = []
 
-    # 0. User workspace RAG context (injected first so it has highest visibility)
+    # 0. Constant context (always first - initial instruction + workspace)
+    if constant_context:
+        sections.append(constant_context)
+
+    # 1. User workspace
     if user_workspace_path is not None:
         try:
             from .workspace_rag import build_workspace_rag_context

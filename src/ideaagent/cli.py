@@ -370,14 +370,7 @@ class IdeaAgentCLI:
     # ── Context & code helpers ────────────────────────────────────────────────
 
     def _format_skills_as_xml(self, skills) -> str:
-        """Format skills as XML string for LLM consumption.
-        
-        Args:
-            skills: List of SkillProperties objects
-            
-        Returns:
-            XML-formatted string of available skills
-        """
+        """Format skills as XML string for LLM consumption."""
         if not skills:
             return "<skills>No skills available</skills>"
         
@@ -395,14 +388,7 @@ class IdeaAgentCLI:
         return "\n".join(xml_parts)
     
     def _plan_to_string(self, plan) -> str:
-        """Convert an ExperimentPlan object to a string representation.
-        
-        Args:
-            plan: ExperimentPlan object
-            
-        Returns:
-            String representation of the plan for LLM consumption
-        """
+        """Convert an ExperimentPlan object to a string representation."""
         lines = [
             f"Title: {plan.title}",
             f"Description: {plan.description}",
@@ -424,78 +410,38 @@ class IdeaAgentCLI:
     def _build_execution_context(
         self, execution_context: list, current_step: int
     ) -> str:
-        """Build execution context string from previous steps (legacy wrapper).
-
-        Delegates to the :mod:`ideaagent.utils.workspace` utility so that the
-        richer version (with installed packages, files created, etc.) is used
-        automatically when those fields are present in the context dicts.
-        """
+        """Build execution context string from previous steps (legacy wrapper)."""
         from .utils.workspace import build_execution_context
-
         return build_execution_context(execution_context, current_step)
 
     def _get_workspace_structure(self, workspace_dir: Path, max_depth: int = 3) -> str:
-        """Get the directory structure of the workspace.
-
-        Args:
-            workspace_dir: Path to the workspace directory.
-            max_depth: Maximum depth to traverse.
-
-        Returns:
-            String representation of the directory structure.
-        """
+        """Get the directory structure of the workspace."""
         from .utils.workspace import get_workspace_structure
-
         return get_workspace_structure(workspace_dir, max_depth)
 
     def _extract_python_code(self, text: str) -> str:
-        """Extract Python code from markdown code blocks.
-
-        Delegates to the robust :func:`~ideaagent.utils.code_parser.extract_python_code`
-        implementation which handles multiple blocks, de-duplicates imports, and
-        validates syntax.
-
-        Args:
-            text: Text containing markdown code blocks.
-
-        Returns:
-            Extracted Python code or empty string if none found.
-        """
+        """Extract Python code from markdown code blocks."""
         from .utils.code_parser import extract_python_code
-
         return extract_python_code(text)
 
     def _parse_response_sections(self, text: str) -> list[tuple[str, str]]:
-        """Parse response into alternating text and code sections.
-
-        Args:
-            text: Raw response text potentially containing ```python ... ``` blocks.
-
-        Returns:
-            List of (section_type, content) tuples where section_type is either
-            'text' or 'code'.
-        """
+        """Parse response into alternating text and code sections."""
         import re
         sections: list[tuple[str, str]] = []
-        
-        # Pattern to match ```python ... ``` or ``` ... ``` blocks
         pattern = r'```(?:python|py)?\s*\n(.*?)```'
         
         last_end = 0
         for match in re.finditer(pattern, text, re.DOTALL | re.IGNORECASE):
-            # Get text before the code block
             before_text = text[last_end:match.start()].strip()
             if before_text:
                 sections.append(('text', before_text))
             
-            # Get the code block content
             code_content = match.group(1).strip()
             if code_content:
                 sections.append(('code', code_content))
             
             last_end = match.end()
         
-        # Add any remaining text after the last code block
         remaining = text[last_end:].strip()
         if remaining:
             sections.append(('text', remaining))
@@ -503,13 +449,7 @@ class IdeaAgentCLI:
         return sections
 
     def _display_response_sections(self, text: str, title: str = "Response", border_style: str = "green") -> None:
-        """Display response with Python code blocks rendered as syntax-highlighted code.
-
-        Args:
-            text: Raw response text potentially containing ```python ... ``` blocks.
-            title: Title for the panel/wrapper
-            border_style: Color style for borders
-        """
+        """Display response with Python code blocks rendered as syntax-highlighted code."""
         if not text:
             self.console.print(f"[dim]{title}: (empty)[/dim]")
             return
@@ -520,7 +460,6 @@ class IdeaAgentCLI:
             self.console.print(f"[dim]{title}: (empty)[/dim]")
             return
         
-        # If only one text section, display as plain text panel
         if len(sections) == 1 and sections[0][0] == 'text':
             display_text = text[:2000] + ("..." if len(text) > 2000 else "")
             self.console.print(
@@ -528,13 +467,10 @@ class IdeaAgentCLI:
             )
             return
         
-        # Multiple sections or contains code - display each section
         self.console.print(f"\n[bold cyan]{title}:[/bold cyan]")
         
         for i, (section_type, content) in enumerate(sections):
             if section_type == 'code':
-                # Render with syntax highlighting
-                # Truncate very long code blocks for display
                 if len(content) > 8000:
                     content = content[:8000] + "\n... [truncated]"
                 
@@ -547,21 +483,13 @@ class IdeaAgentCLI:
                 )
                 self.console.print(Panel(syntax, title="[bold green]Python Code[/bold green]", border_style="yellow"))
             else:
-                # Plain text section - truncate if too long
                 display_content = content[:2000] + ("..." if len(content) > 2000 else "")
                 self.console.print(
                     Panel(display_content, title="[bold yellow]Text[/bold yellow]", border_style="blue", padding=(0, 1))
                 )
 
     def _build_skill_system_prompt(self, skill) -> str:
-        """Build a skill-aware system prompt injection string.
-
-        Args:
-            skill: :class:`~ideaagent.skills.manager.SkillProperties` object.
-
-        Returns:
-            Formatted string to prepend to system messages.
-        """
+        """Build a skill-aware system prompt injection string."""
         skill_path = self.skill_manager.get_skill_path(skill.name)
         if skill_path is None:
             return ""
@@ -576,25 +504,13 @@ class IdeaAgentCLI:
         )
 
     def _thinking_callback_factory(self, step_num: int, iteration: int):
-        """Create a callback function for streaming thinking output.
-
-        Args:
-            step_num: Current step number
-            iteration: Current iteration attempt number
-
-        Returns:
-            Callback function for streaming thinking content
-        """
+        """Create a callback function for streaming thinking output."""
         buffer = []
         
         def callback(chunk_type: str, content: str):
             if chunk_type == 'thinking':
                 buffer.append(content)
-                # Stream thinking output in real-time
-                self.console.print(
-                    f"[cyan]{content}[/cyan]",
-                    end="",
-                )
+                self.console.print(f"[cyan]{content}[/cyan]", end="")
                 self.console.file.flush()
         
         return callback
@@ -609,27 +525,7 @@ class IdeaAgentCLI:
         workspace_dir: Path,
         installed_packages: list[str],
     ) -> tuple[bool, str, str, str]:
-        """Execute a single step using the new action-based Agentic Loop.
-
-        The loop works as follows:
-          1. Generate response with actions (first iteration only).
-          2. Parse all actions from the response.
-          3. Execute each action (BASH, PYTHON, WRITE_FILE, READ_FILE, MKDIR).
-          4. Collect all outputs.
-          5. Pass outputs to LLM for judgment.
-          6. LLM decides: "success" or "fix".
-          7. Repeat until LLM says success or max iterations reached.
-
-        Args:
-            step: ExperimentStep to execute.
-            full_context: Rich context string (workspace + history).
-            skill_instructions: Full SKILL.md text if a skill is required.
-            workspace_dir: Task workspace directory.
-            installed_packages: Mutable list tracking packages installed so far.
-
-        Returns:
-            ``(success, output, error, final_code)``
-        """
+        """Execute a single step using the new action-based Agentic Loop."""
         from .utils.code_parser import parse_agent_actions, ActionType
         from .utils.file_manager import FileManager
         from .utils.bash_executor import BashExecutor
@@ -637,7 +533,6 @@ class IdeaAgentCLI:
         research_type = getattr(self, "_current_research_type", None)
         max_iterations = settings.max_agent_iterations
         
-        # Initialize executors
         file_manager = FileManager(workspace_dir)
         bash_executor = BashExecutor(timeout=settings.execution_timeout)
         
@@ -659,7 +554,6 @@ class IdeaAgentCLI:
                 iteration, max_iterations, step.step_number,
             )
 
-            # ── 1. First iteration: generate fresh response ──────────────────
             if iteration == 1:
                 use_streaming = hasattr(self.llm, 'stream_execute_step_with_thinking')
                 
@@ -694,7 +588,6 @@ class IdeaAgentCLI:
 
                 self._display_response_sections(raw_response, "Generated Response", border_style="green")
 
-            # ── 2. Parse actions ─────────────────────────────────────────────
             actions = parse_agent_actions(raw_response)
             
             if not actions:
@@ -702,7 +595,6 @@ class IdeaAgentCLI:
                 last_error = "No actions found in LLM response"
                 last_returncode = 1
             else:
-                # ── 3. Execute each action ───────────────────────────────────
                 action_outputs = []
                 has_failure = False
                 
@@ -713,7 +605,6 @@ class IdeaAgentCLI:
                     
                     try:
                         if action.action_type == ActionType.THINKING:
-                            # Thinking is just logged, not executed
                             self.console.print(f"    [cyan]Thinking: {action.content[:100]}...[/cyan]")
                             action_outputs.append(f"[THINKING] {action.content}")
                             
@@ -808,7 +699,6 @@ class IdeaAgentCLI:
                         action_outputs.append(f"[ERROR] {action.action_type.value}: {e}")
                         has_failure = True
                 
-                # Combine all outputs
                 if action_outputs:
                     combined_output = "\n".join(action_outputs)
                     if last_output and last_output not in combined_output:
@@ -816,7 +706,6 @@ class IdeaAgentCLI:
                     else:
                          last_output = combined_output
 
-            # ── 4. LLM judges the output ─────────────────────────────────────
             self.console.print("\n[bold cyan]Asking LLM to judge execution...[/bold cyan]")
             with Progress(
                 SpinnerColumn(),
@@ -844,7 +733,6 @@ class IdeaAgentCLI:
                 self.console.print("[bold green][OK] LLM confirmed: step succeeded![/bold green]")
                 return True, last_output, last_error, raw_response
 
-            # LLM says fix needed
             reason = judgment.get("reason", "unknown")
             fixed_response = judgment.get("code", "")
             logger.info("Step %d: LLM says fix needed (attempt %d): %s",
@@ -860,7 +748,6 @@ class IdeaAgentCLI:
             raw_response = fixed_response
             self._display_response_sections(raw_response, "Fixed Response", border_style="yellow")
 
-        # All attempts exhausted
         logger.error("Step %d failed after %d attempts", step.step_number, max_iterations)
         return False, last_output, last_error, raw_response
 
@@ -879,20 +766,7 @@ class IdeaAgentCLI:
     def _display_sandbox_output(
         self, success: bool, output: str, error: str
     ) -> None:
-        """Render sandbox stdout/stderr in the console.
-
-        * stdout and stderr are shown in **separate** panels so they are easy
-          to distinguish at a glance.
-        * Pip ``[notice]`` / ``WARNING: pip`` housekeeping lines are stripped
-          from stderr so they don't clutter the error panel.
-        * Each panel is capped at 3 000 / 2 000 characters respectively to
-          avoid flooding the terminal with huge traces.
-
-        Args:
-            success: Whether the execution succeeded.
-            output: stdout captured from the sandbox.
-            error: stderr captured from the sandbox.
-        """
+        """Render sandbox stdout/stderr in the console."""
         clean_out = (output or "").strip()
         clean_err = self._filter_pip_noise(error or "")
 
@@ -950,35 +824,16 @@ class IdeaAgentCLI:
         idea: str,
         effective_workspace: Optional[Path] = None,
     ) -> None:
-        """Execute the approved plan step by step.
-
-        This is the main execution loop.  For each step it:
-        1. Loads optional skill instructions.
-        2. Builds a rich context (workspace structure + history + environment).
-        3. Calls :meth:`_execute_step_with_agent_loop` which runs the inner
-           agent loop (generate → validate → execute → fix & retry).
-        4. Records the result and persists the task state.
-
-        Args:
-            state_manager: :class:`~ideaagent.state.TaskStateManager` for the
-                current task.
-            plan: :class:`~ideaagent.models.ExperimentPlan` to execute.
-            idea: Original research idea description.
-            effective_workspace: The resolved user workspace for **this run only**.
-                Passed down from :meth:`run_task_interactive` so the sandbox
-                workspace creation logic (``self.sandbox.create_task_workspace``)
-                is never affected – only the AgenticRAG context injection uses it.
-        """
+        """Execute the approved plan step by step."""
         import time
         from .models import ExecutionResult
         from .utils.workspace import build_rich_context
+        from .prompts import build_constant_context_section
 
         logger.info("Starting execution of plan with %d steps", len(plan.steps))
 
-        # Store research type so the agent-loop helper can access it
         self._current_research_type = state_manager.task.research_type
 
-        # Create task workspace
         task_name = (
             state_manager.task.idea_description[:50]
             if state_manager.task.idea_description
@@ -987,12 +842,16 @@ class IdeaAgentCLI:
         workspace_dir = self.sandbox.create_task_workspace(task_name)
         logger.info("Created task workspace: %s", workspace_dir)
         self.console.print(
-            f"\n[bold green]📁 Task Workspace:[/bold green] [dim]{workspace_dir}[/dim]"
+            f"\n[bold green]Task Workspace:[/bold green] [dim]{workspace_dir}[/dim]"
         )
 
-        # Running state
         execution_context: list[dict] = []
         installed_packages: list[str] = []
+
+        constant_context = build_constant_context_section(
+            workspace_path=effective_workspace,
+            initial_instruction=idea,
+        )
 
         for step in plan.steps:
             current_step_num = state_manager.get_current_step()
@@ -1001,7 +860,6 @@ class IdeaAgentCLI:
                 "Step %d/%d: %s", current_step_num, len(plan.steps), step.description
             )
 
-            # ── Step header ──────────────────────────────────────────────────
             self.console.print()
             self.console.print(
                 Rule(
@@ -1011,7 +869,6 @@ class IdeaAgentCLI:
             )
             self.console.print(f"  [bold white]{step.description}[/bold white]")
 
-            # ── Skill loading (Issue 2.1 fix) ─────────────────────────────
             skill_instructions: Optional[str] = None
             if step.skill_required:
                 logger.info("Using skill: %s", step.skill_required)
@@ -1020,7 +877,6 @@ class IdeaAgentCLI:
                 )
                 skill_obj = self.skill_manager.get_skill(step.skill_required)
                 if skill_obj:
-                    # ── Pre-install skill requirements ─────────────────────
                     try:
                         pkgs_installed = self.skill_manager.install_skill_requirements(
                             step.skill_required, self.sandbox
@@ -1060,17 +916,17 @@ class IdeaAgentCLI:
                         "continuing without it.[/yellow]"
                     )
 
-            # ── Rich context building (Issue 3.1 fix) ─────────────────────
             full_context = build_rich_context(
                 workspace_dir=workspace_dir,
                 execution_context=execution_context,
                 current_step=step.step_number,
                 installed_packages=installed_packages,
                 user_workspace_path=effective_workspace,
+                constant_context=constant_context,
             )
 
             self.console.print(
-                "\n[bold yellow]📞 Calling LLM for execution instructions...[/bold yellow]"
+                "\n[bold yellow]Calling LLM for execution instructions...[/bold yellow]"
             )
             logger.info("Calling LLM for execution instructions")
 
@@ -1084,7 +940,6 @@ class IdeaAgentCLI:
                         False, "", "LLM client not initialized", ""
                     )
                 else:
-                    # ── Agent loop (Issue 1.1 fix) ─────────────────────────
                     success, output, error, final_code = (
                         await self._execute_step_with_agent_loop(
                             step=step,
@@ -1102,7 +957,6 @@ class IdeaAgentCLI:
 
             execution_time = time.time() - start_time
 
-            # ── Record result ────────────────────────────────────────────────
             result = ExecutionResult(
                 step_number=step.step_number,
                 success=success,
@@ -1113,7 +967,6 @@ class IdeaAgentCLI:
             state_manager.add_execution_result(result)
             self.db.save_task(state_manager.task)
 
-            # ── Update execution context for next step (Issue 3.1 fix) ─────
             execution_context.append(
                 {
                     "step_number": step.step_number,
@@ -1132,7 +985,6 @@ class IdeaAgentCLI:
                 }
             )
 
-            # ── Step summary ─────────────────────────────────────────────────
             if success:
                 self.console.print(
                     f"\n  [green]✓ Step Completed[/green] "
@@ -1148,7 +1000,6 @@ class IdeaAgentCLI:
                 logger.error("Step %d failed: %s", step.step_number, error)
                 break
 
-            # ── Loop detection ───────────────────────────────────────────────
             should_stop, reason = self.loop_detector.analyze(state_manager.task)
             if should_stop:
                 logger.warning("Loop detected: %s", reason)
@@ -1157,12 +1008,7 @@ class IdeaAgentCLI:
                 self.db.save_task(state_manager.task)
                 break
 
-        # ── Task completion ──────────────────────────────────────────────────
         if state_manager.task.status.value == "running":
-            # Only mark completed when EVERY planned step actually succeeded.
-            # A step failure causes an early `break`, so either
-            # execution_results is shorter than plan.steps, or its last entry
-            # has success=False.
             all_succeeded = (
                 len(state_manager.task.execution_results) == len(plan.steps)
                 and all(r.success for r in state_manager.task.execution_results)
@@ -1212,20 +1058,7 @@ class IdeaAgentCLI:
         idea: str,
         run_workspace: Optional[Path] = None,
     ) -> None:
-        """Run a task interactively with progress display.
-
-        Args:
-            research_type: One of ``deep-learning``, ``machine-learning``, ``agent``.
-            idea: Natural language description of the research idea.
-            run_workspace: Optional path to a user workspace **for this run only**.
-                Overrides ``self.user_workspace`` for the duration of this single run.
-                When the run finishes (success, failure, or exception), this value
-                is NOT stored back to ``self.user_workspace`` – the next run starts
-                fresh.  If ``None``, falls back to ``self.user_workspace`` (the
-                session-level default set via ``--workspace`` at launch).
-        """
-        # Resolve the effective workspace for this run only.
-        # Priority: run-level > session-level (--workspace flag) > None
+        """Run a task interactively with progress display."""
         effective_workspace: Optional[Path] = run_workspace or self.user_workspace
         if effective_workspace is not None:
             self.console.print(
@@ -1262,7 +1095,6 @@ class IdeaAgentCLI:
             state_manager.start_planning()
             self.db.save_task(task)
 
-            # ── Plan generation ──────────────────────────────────────────────
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
@@ -1280,7 +1112,6 @@ class IdeaAgentCLI:
 
                 available_skills_xml = self.skill_manager.to_prompt_xml()
 
-                # ── AgenticRAG: inject user workspace context into planning ──
                 workspace_rag_context = ""
                 if effective_workspace is not None:
                     try:
@@ -1300,8 +1131,6 @@ class IdeaAgentCLI:
                             rag_exc,
                         )
 
-                # Augment the idea description with workspace context so the
-                # plan can take existing files and data into account.
                 augmented_idea = idea
                 if workspace_rag_context:
                     augmented_idea = (
@@ -1317,7 +1146,6 @@ class IdeaAgentCLI:
             state_manager.set_plan(plan)
             self.db.save_task(task)
 
-            # ── Show plan ────────────────────────────────────────────────────
             self.console.print("\n[bold]Generated Experiment Plan:[/bold]")
             self.console.print(
                 Panel(
@@ -1340,7 +1168,6 @@ class IdeaAgentCLI:
                     f"  {step.step_number}. {step.description}{skill_info}{time_info}"
                 )
 
-            # ── Approval ─────────────────────────────────────────────────────
             self.console.print()
             approved = Confirm.ask(
                 "[bold]Do you want to proceed with this plan?[/bold]"
@@ -1355,14 +1182,12 @@ class IdeaAgentCLI:
                     effective_workspace=effective_workspace,
                 )
             else:
-                # ── Plan rejected: get feedback and regenerate ─────────────────
                 feedback = Prompt.ask(
                     "\n[bold]What would you like to change?[/bold]"
                 )
                 state_manager.reject_plan(feedback)
                 self.db.save_task(task)
                 
-                # Regeneration loop: allow up to 3 attempts
                 max_regeneration_attempts = 3
                 regeneration_attempt = 0
                 
@@ -1370,7 +1195,7 @@ class IdeaAgentCLI:
                     regeneration_attempt += 1
                     
                     self.console.print(
-                        f"\n[bold yellow]🔄 Regenerating plan (attempt {regeneration_attempt}/{max_regeneration_attempts})...[/bold yellow]"
+                        f"\n[bold yellow]Regenerating plan (attempt {regeneration_attempt}/{max_regeneration_attempts})...[/bold yellow]"
                     )
                     logger.info(
                         "Regenerating plan with feedback (attempt %d/%d)",
@@ -1379,11 +1204,9 @@ class IdeaAgentCLI:
                     )
                     
                     try:
-                        # Get available skills
                         skills = self.skill_manager.discover_skills()
                         available_skills_xml = self._format_skills_as_xml(skills)
                         
-                        # Regenerate plan with feedback
                         with Progress(
                             SpinnerColumn(),
                             TextColumn("[progress.description]{task.description}"),
@@ -1394,10 +1217,8 @@ class IdeaAgentCLI:
                                 total=None,
                             )
                             
-                            # Convert previous plan to string for LLM
                             previous_plan_str = self._plan_to_string(plan)
                             
-                            # Call LLM to regenerate
                             plan = self.llm.regenerate_plan(
                                 research_type=rtype,
                                 idea_description=augmented_idea,
@@ -1407,8 +1228,7 @@ class IdeaAgentCLI:
                             )
                             progress.update(task_gen, completed=True)
                         
-                        # Show regenerated plan
-                        self.console.print("\n[bold]📋 Regenerated Experiment Plan:[/bold]")
+                        self.console.print("\n[bold]Regenerated Experiment Plan:[/bold]")
                         self.console.print(
                             Panel(
                                 f"[cyan]{plan.title}[/cyan]\n\n{plan.description}",
@@ -1430,14 +1250,12 @@ class IdeaAgentCLI:
                                 f"  {step.step_number}. {step.description}{skill_info}{time_info}"
                             )
                         
-                        # Ask for approval again
                         self.console.print()
                         approved = Confirm.ask(
                             "[bold]Do you want to proceed with this plan?[/bold]"
                         )
                         
                         if approved:
-                            # Update task with new plan
                             task.plan = plan
                             state_manager.set_plan(plan)
                             state_manager.approve_plan()
@@ -1448,14 +1266,12 @@ class IdeaAgentCLI:
                                 "\n[bold green]✓ Starting execution...[/bold green]"
                             )
                             
-                            # Execute the approved plan
                             await self._execute_plan(
                                 state_manager, plan, idea,
                                 effective_workspace=effective_workspace,
                             )
-                            break  # Exit regeneration loop
+                            break
                         else:
-                            # Ask for new feedback
                             feedback = Prompt.ask(
                                 "\n[bold]What else would you like to change?[/bold]"
                             )
@@ -1476,9 +1292,8 @@ class IdeaAgentCLI:
                             self.console.print(
                                 "[red]✗ Maximum regeneration attempts reached.[/red]"
                             )
-                            break  # Exit regeneration loop
+                            break
                 
-                # If we exhausted all regeneration attempts
                 if regeneration_attempt >= max_regeneration_attempts:
                     self.console.print(
                         "\n[yellow]⚠ Plan generation failed after multiple attempts. "
@@ -1526,13 +1341,7 @@ class IdeaAgentCLI:
                 break
 
     def _handle_command(self, command: str) -> None:
-        """Dispatch a CLI command string.
-
-        Args:
-            command: Full command string starting with ``/``.
-        """
-        # Split into at most 3 parts so that the third part can be a
-        # path/string containing spaces (e.g. /workspace C:\My Data\project)
+        """Dispatch a CLI command string."""
         parts = command.split(maxsplit=2)
         cmd = parts[0].lower()
 
@@ -1558,7 +1367,6 @@ class IdeaAgentCLI:
                 default="machine-learning",
             )
             idea = Prompt.ask("[bold]Describe your research idea[/bold]")
-            # ── Per-run workspace (AgenticRAG) ────────────────────────────
             ws_input = Prompt.ask(
                 "[bold]Workspace path for this run[/bold] "
                 "[dim](leave empty to skip / use session default)[/dim]",
@@ -1592,15 +1400,12 @@ class IdeaAgentCLI:
                     "--workspace ./my_data[/dim]"
                 )
                 return
-            # Parse optional --workspace / -w at end of prompt string
-            # e.g. /run machine-learning "my idea" --workspace ./folder
             run_type = parts[1]
-            rest = parts[2]  # everything after the type
+            rest = parts[2]
             run_ws_path: Optional[Path] = None
             for flag in ("--workspace ", "-w "):
                 if flag in rest:
                     prompt_part, _, ws_part = rest.partition(flag)
-                    # ws_part may have trailing text — take the next token
                     ws_token = ws_part.strip().split()[0].strip('"').strip("'") if ws_part.strip() else ""
                     if ws_token:
                         candidate = Path(ws_token).expanduser().resolve()
@@ -1660,14 +1465,8 @@ class IdeaAgentCLI:
             self.console.print("[dim]Type /help for available commands.[/dim]")
 
     def _handle_workspace_command(self, parts: list[str]) -> None:
-        """Handle /workspace [path|clear] command.
-
-        - ``/workspace``        – show current workspace status
-        - ``/workspace <path>`` – set a new workspace for this session
-        - ``/workspace clear``  – clear the workspace (disable AgenticRAG)
-        """
+        """Handle /workspace [path|clear] command."""
         if len(parts) < 2:
-            # Show current workspace status
             if self.user_workspace is not None:
                 try:
                     file_count = sum(
@@ -1677,7 +1476,6 @@ class IdeaAgentCLI:
                         f"[bold]Current workspace:[/bold] [green]{self.user_workspace}[/green]"
                         f" [dim]({file_count} files)[/dim]"
                     )
-                    # Show the files that will be read
                     from .utils.workspace_rag import scan_workspace
                     records = scan_workspace(self.user_workspace)
                     if records:
@@ -1692,8 +1490,6 @@ class IdeaAgentCLI:
                 self.console.print("[dim]No workspace set. Use /workspace <path> to set one.[/dim]")
             return
 
-        # Join all remaining parts so paths with spaces work correctly.
-        # e.g. /workspace C:\My Data\project → parts[1:] = ['C:\\My', 'Data\\project']
         arg = " ".join(parts[1:]).strip().strip('"').strip("'")
 
         if arg.lower() == "clear":
@@ -1701,7 +1497,6 @@ class IdeaAgentCLI:
             self.console.print("[green]Workspace cleared. AgenticRAG disabled.[/green]")
             return
 
-        # Treat as a path
         new_path = Path(arg).expanduser().resolve()
         if not new_path.exists():
             self.console.print(f"[red]Path does not exist: {new_path}[/red]")
@@ -1759,10 +1554,7 @@ class IdeaAgentCLI:
     ),
 )
 def main(workspace: Optional[str]):
-    """IdeaAgent - Experimental Agent for ML Research.
-
-    Interactive CLI for validating machine learning research ideas.
-    """
+    """IdeaAgent - Experimental Agent for ML Research."""
     try:
         cli = IdeaAgentCLI(
             user_workspace=Path(workspace) if workspace else None,
