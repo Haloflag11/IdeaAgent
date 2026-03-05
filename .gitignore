@@ -50,7 +50,7 @@ logs/
 
 # Workspace files
 sandbox_workspaces/
-user_workspace/
+
 
 # MCP configuration (may contain secrets)
 mcp_config.json
