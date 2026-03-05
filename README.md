@@ -53,8 +53,11 @@ IdeaAgent validate ./skills/your-skill
 # List available skills
 IdeaAgent skills
 
+#Individualy set workspace
+IdeaAgent: /workspace ./user_workspace
+
 # Run with specific idea
-IdeaAgent run --type "deep-learning" --prompt "Your research idea here"
+IdeaAgent: /run  "deep-learning"  "Your research idea here" --workspace ./user_workspace
 ```
 
 ## Project Structure
