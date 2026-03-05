@@ -1,3 +1,4 @@
+## **This is a very early edition，feel free to submit issues or contributions**
 # IdeaAgent
 
 Experimental Agent for validating machine learning research ideas.
@@ -13,7 +14,7 @@ Experimental Agent for validating machine learning research ideas.
 - Real-time task status tracking and display
 - Sandboxed execution using conda environments
 - Loop detection to prevent infinite execution
-- MongoDB for persistent storage
+- SQLlite for persistent storage
 - MCP (Model Context Protocol) support
 - CLI interface inspired by Claude Code
 
