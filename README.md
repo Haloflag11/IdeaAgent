@@ -2,11 +2,7 @@
 
 Experimental Agent for validating machine learning research ideas.
 
-## Star History
 
-| Date       | Stars |
-|------------|-------|
-| 2026-03-05 | 0     |
 
 ## Features
 
@@ -109,7 +105,10 @@ EOF
 # Validate the skill
 IdeaAgent validate ./skills/my-skill
 ```
+## Star History
+
+[![Star History Chart](https://api.star-history.com/image?repos=Haloflag11/IdeaAgent.git&type=date&legend=top-left)](https://www.star-history.com/?repos=Haloflag11%2FIdeaAgent.git&type=date&legend=top-left)
 
 ## License
 
-MIT
+Apache License 2.0
