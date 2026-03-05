@@ -824,7 +824,7 @@ class IdeaAgentCLI:
                 console=self.console,
             ) as progress:
                 t = progress.add_task("[cyan]LLM judging...", total=None)
-                thinking_cb_judge=self._thinking_callback_factory()
+                thinking_cb_judge=self._thinking_callback_factory(step.step_number, iteration)
                 judgment = self.llm.judge_and_fix(
                     research_type=research_type,
                     step_description=step.description,
