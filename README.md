@@ -1,3 +1,4 @@
+## **This is a very early edition，feel free to submit issues or contributions**
 # IdeaAgent
 
 Experimental Agent for validating machine learning research ideas.
