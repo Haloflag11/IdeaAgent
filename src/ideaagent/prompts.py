@@ -12,53 +12,9 @@ GBK/CP936 consoles at runtime.  Use ASCII-only alternatives throughout.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Optional
 
 from .models import ResearchType
-
-
-# ===========================================================================
-# CONSTANT CONTEXT SECTION - Always included in every LLM call
-# ===========================================================================
-
-def build_constant_context_section(
-    workspace_path: Optional[Path],
-    initial_instruction: str,
-) -> str:
-    """Build the constant context section that is always included in LLM calls.
-    
-    This section contains information that must remain stable throughout
-    the entire task execution:
-    - Initial instruction (user's original research idea/request)
-    - Workspace path (if specified)
-    
-    Args:
-        workspace_path: Path to user workspace directory, or None if not specified.
-        initial_instruction: The original research idea or task description.
-        
-    Returns:
-        Formatted constant context string for inclusion in prompts.
-    """
-    lines = [
-        "=== CONSTANT CONTEXT ===",
-        "",
-        "# Initial Instruction",
-        initial_instruction,
-        "",
-    ]
-    
-    if workspace_path is not None:
-        lines.extend([
-            "# User Workspace",
-            f"Path: {workspace_path}",
-            "",
-        ])
-    else:
-        lines.append("# User Workspace: Not specified")
-        lines.append("")
-    
-    return "\n".join(lines)
 
 
 # ===========================================================================
