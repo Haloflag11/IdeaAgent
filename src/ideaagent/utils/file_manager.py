@@ -147,7 +147,7 @@ class FileManager:
                 return {
                     "success": False,
                     "path": path,
-                    "error": f"File not found: {path}",
+                    "error": f"File not found: {path}. HINT: Use relative path like './data/file.txt' or 'data/file.txt', NOT absolute path.",
                 }
             
             if not file_path.is_file():
