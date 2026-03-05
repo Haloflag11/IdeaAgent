@@ -975,17 +975,24 @@ class IdeaAgentCLI:
 
         logger.info("Starting execution of plan with %d steps", len(plan.steps))
 
-        # Store research type so the agent-loop helper can access it
-        self._current_research_type = state_manager.task.research_type
-
-        # Create task workspace
+        # Create task workspace - use effective_workspace if provided, otherwise use sandbox default
         task_name = (
             state_manager.task.idea_description[:50]
             if state_manager.task.idea_description
             else f"task_{state_manager.task.id}"
         )
-        workspace_dir = self.sandbox.create_task_workspace(task_name)
+        
+        # When user specifies a workspace, create task workspace inside it
+        if effective_workspace is not None:
+            workspace_dir = self.sandbox.create_task_workspace(task_name, base_dir=effective_workspace)
+        else:
+            workspace_dir = self.sandbox.create_task_workspace(task_name)
+        
         logger.info("Created task workspace: %s", workspace_dir)
+
+        # Store research type so the agent-loop helper can access it
+        self._current_research_type = state_manager.task.research_type
+
         self.console.print(
             f"\n[bold green]📁 Task Workspace:[/bold green] [dim]{workspace_dir}[/dim]"
         )

@@ -141,7 +141,16 @@ def build_rich_context(
             from .workspace_rag import build_workspace_rag_context
             rag_context = build_workspace_rag_context(user_workspace_path)
             if rag_context:
-                sections.append(rag_context)
+                # Prepend a prominent workspace path reminder
+                path_header = (
+                    f"=== USER WORKSPACE PATH (AgenticRAG) ===\n"
+                    f"Your specified workspace directory:\n"
+                    f"{user_workspace_path.resolve()}\n\n"
+                    f"All file paths referenced in the 'USER WORKSPACE FILES' section below\n"
+                    f"are relative to this directory. When reading files or referencing\n"
+                    f"code locations, use this base path.\n\n"
+                )
+                sections.append(path_header + rag_context)
         except Exception as _rag_exc:
             import logging as _logging
             _logging.getLogger("IdeaAgent.workspace").warning(

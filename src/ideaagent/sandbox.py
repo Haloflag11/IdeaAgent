@@ -405,7 +405,7 @@ class VenvSandbox:
     # Standard subdirectories created in every task workspace
     WORKSPACE_SUBDIRS: tuple[str, ...] = ("data", "models", "plots", "results", "logs")
 
-    def create_task_workspace(self, task_name: str) -> Path:
+    def create_task_workspace(self, task_name: str, base_dir: Optional[Path] = None) -> Path:
         """Create a workspace directory for a task, including standard subdirs.
 
         The following subdirectories are always pre-created so that LLM-generated
@@ -419,6 +419,10 @@ class VenvSandbox:
 
         Args:
             task_name: Name of the task (used for directory naming)
+            base_dir: Optional base directory for the task workspace. If provided,
+                the task workspace will be created under this directory instead of
+                the default sandbox workspace. This is useful when a user specifies
+                a custom workspace via --workspace flag.
 
         Returns:
             Path to the task workspace directory
@@ -427,7 +431,9 @@ class VenvSandbox:
         safe_name = "".join(c if c.isalnum() or c in ' -_' else '_' for c in task_name)
         safe_name = safe_name[:50]  # Limit length
 
-        workspace_dir = self.workspace / safe_name
+        # Use provided base_dir or fall back to default sandbox workspace
+        actual_base = base_dir or self.workspace
+        workspace_dir = actual_base / safe_name
         workspace_dir.mkdir(parents=True, exist_ok=True)
 
         # Pre-create standard subdirectories

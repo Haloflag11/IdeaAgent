@@ -367,12 +367,15 @@ def build_workspace_rag_context(
         return ""
 
     header_banner = (
-        "=== USER WORKSPACE FILES (AgenticRAG) ===\n"
-        "The following files were found in the user-specified workspace.\n"
-        "Use their content as GROUND TRUTH for data paths, column names,\n"
-        "existing code, configuration values, and any domain knowledge.\n"
-        "When writing code, prefer to load these files directly rather than\n"
-        "recreating the data from scratch.\n"
+        f"=== USER WORKSPACE FILES (AgenticRAG) ===\n"
+        f"**USER-WORKSPACE PATH:** {workspace_path.resolve()}\n\n"
+        f"The following files were found in the user-specified workspace.\n"
+        f"Use their content as GROUND TRUTH for data paths, column names,\n"
+        f"existing code, configuration values, and any domain knowledge.\n"
+        f"IMPORTANT: All file references in this section are relative to the\n"
+        f"user-workspace path above: [{workspace_path.resolve()}]\n\n"
+        f"When writing code, prefer to load these files directly rather than\n"
+        f"recreating the data from scratch.\n"
     )
 
     return (

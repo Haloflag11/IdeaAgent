@@ -61,6 +61,8 @@ IdeaAgent: /workspace ./user_workspace
 
 # Run with specific idea
 IdeaAgent: /run  "deep-learning"  "Your research idea here" --workspace ./user_workspace
+
+Example： /run machine-learning Compare Linear Regression and Logistic Regression
 ```
 
 ## Project Structure
