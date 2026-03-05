@@ -2,7 +2,9 @@
 
 Experimental Agent for validating machine learning research ideas.
 
+## CLI
 
+![UI](./asset/ui.png)
 
 ## Features
 
