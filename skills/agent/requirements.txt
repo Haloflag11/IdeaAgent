@@ -1,0 +1,5 @@
+openai>=1.0
+tiktoken>=0.5
+numpy>=1.21
+pandas>=1.4
+python-dotenv>=1.0
