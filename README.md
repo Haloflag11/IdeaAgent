@@ -33,6 +33,8 @@ Run your idea with a single command, and leave it to IdeaAgent
 - MCP (Model Context Protocol) support
 - CLI interface inspired by Claude Code
 
+WARNING ⚠️: This project is still in early development. It is strongly recommended not to run experiments with high complexity or long training time. Or your device may get damaged.
+
 ## Installation
 
 ```bash
