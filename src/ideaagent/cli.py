@@ -127,15 +127,15 @@ class IdeaAgentCLI:
     # ── Banner & welcome ──────────────────────────────────────────────────────
 
     def print_banner(self) -> None:
-        """Print application banner."""
-        banner = Text()
-        banner.append("IdeaAgent ", style="bold magenta")
-        banner.append("v0.1.0\n", style="dim")
-        banner.append("Experimental Agent for ML Research\n", style="dim italic")
-        banner.append("Type ", style="dim")
-        banner.append("? ", style="bold cyan")
-        banner.append("for shortcuts", style="dim")
-        self.console.print(Panel(banner, border_style="magenta"))
+        """Print application banner.
+
+        The actual banner characters and panel styling live in
+        :mod:`ideaagent.utils.banner` to keep the CLI class free of raw
+        art-string literals.
+        """
+        from .utils.banner import get_banner_panel
+
+        self.console.print(get_banner_panel())
 
     def print_welcome(self) -> None:
         """Print welcome message with status grid."""

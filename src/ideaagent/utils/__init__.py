@@ -11,6 +11,7 @@ from .code_parser import (
     sanitize_unicode,
     extract_package_names,
 )
+from .banner import get_banner_text, get_banner_panel
 
 __all__ = [
     "BashExecutor",
@@ -22,4 +23,6 @@ __all__ = [
     "validate_python_code",
     "sanitize_unicode",
     "extract_package_names",
+    "get_banner_text",
+    "get_banner_panel",
 ]

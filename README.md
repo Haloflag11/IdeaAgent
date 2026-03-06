@@ -1,11 +1,24 @@
-## **This is a very early edition，feel free to submit issues or contributions**
+
+<div align="center">
+
+![UI](./asset/cover.png)
+
+
+
+<br/>
+<br/>
+
+![Github](https://img.shields.io/badge/github-Haloflag11-blue?logo=github&color=blue&link=https://github.com/Haloflag11) ![Windows](https://img.shields.io/badge/os-windows-orange?logo=windows) ![Last Update](https://img.shields.io/github/last-commit/Haloflag11/IdeaAgent?label=Last%20Update&style=flat-square) ![ML](https://img.shields.io/badge/machine%20learning-yellow?) ![DL](https://img.shields.io/badge/deep%20learning-purple) 
+
+
+<strong> This is a very early edition，feel free to submit issues or contributions
+</div>
+
 # IdeaAgent
 
 Experimental Agent for validating machine learning research ideas.
 
-## CLI
 
-![UI](./asset/ui.png)
 
 ## Features
 
@@ -69,25 +82,47 @@ Example： /run machine-learning Compare Linear Regression and Logistic Regressi
 
 ```
 IdeaAgent/
-├── src/IdeaAgent/          # Main source code
+├── src/ideaagent/          # Main source code
 │   ├── __init__.py
-│   ├── cli.py            # CLI interface
-│   ├── models.py         # Data models
-│   ├── database.py       # MongoDB integration
-│   ├── llm.py            # LLM calling module
-│   ├── skills/           # AgentSkills integration
-│   ├── sandbox.py        # Sandboxed execution
-│   ├── mcp.py            # MCP support
-│   ├── state.py          # Task state management
-│   └── loop_detector.py  # Loop detection
-├── skills/               # Skill definitions
-│   └── example-skill/
-│       ├── SKILL.md
-│       ├── scripts/
-│       └── references/
-├── tests/                # Test files
-├── .env                  # Environment variables (create from .env.example)
-└── pyproject.toml
+│   ├── cli.py              # CLI interface
+│   ├── models.py           # Data models
+│   ├── database.py         # SQLite database integration
+│   ├── llm.py              # LLM calling module
+│   ├── config.py           # Configuration management
+│   ├── prompts.py          # Prompt templates
+│   ├── context.py          # Context management
+│   ├── sandbox.py          # Sandboxed execution
+│   ├── state.py            # Task state management
+│   ├── loop_detector.py    # Loop detection
+│   ├── mcp.py              # MCP (Model Context Protocol) support
+│   ├── exceptions.py       # Custom exceptions
+│   ├── skills/             # AgentSkills integration
+│   │   ├── __init__.py
+│   │   ├── manager.py      # Skill manager
+│   │   └── errors.py       # Skill errors
+│   └── utils/              # Utility modules
+│       ├── __init__.py
+│       ├── code_parser.py  # Code extraction & validation
+│       ├── file_manager.py # File operations
+│       ├── bash_executor.py# Bash command execution
+│       ├── workspace.py    # Workspace management
+│       ├── workspace_rag.py# AgenticRAG context builder
+│       ├── stream_parser.py# Stream output parser
+│       └── banner.py       # Banner utilities
+├── skills/                 # Skill definitions
+│   ├── deep-learning/      # Deep learning skill
+│   ├── machine-learning/   # Machine learning skill
+│   ├── agent/              # Agent skill
+│   ├── data-preprocessing/ # Data preprocessing skill
+│   ├── model-training/     # Model training skill
+│   ├── experiment-tracking/# Experiment tracking skill
+│   └── visualization/      # Visualization skill
+├── tests/                  # Test files
+├── user_workspace/         # User workspace (AgenticRAG)
+├── .env.example            # Environment variables template
+├── .gitignore
+├── pyproject.toml
+└── README.md
 ```
 
 ## Creating Skills
