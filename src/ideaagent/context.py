@@ -169,8 +169,8 @@ class ContextManager:
         """Build the persistent context section that's always included.
         
         This includes:
-        - Initial instruction
-        - Workspace information
+        - Initial instruction (ALWAYS in context)
+        - Workspace information (ALWAYS in context)
         - Research type
         """
         sections = []
@@ -189,19 +189,26 @@ class ContextManager:
             f"{self.persistent.research_type.value}\n"
         )
         
-        # Workspace RAG context (if user workspace is specified)
-        if self.persistent.workspace_rag_context:
-            sections.append(
-                "=== USER WORKSPACE CONTEXT (REFERENCE FILES) ===\n"
-                f"User workspace path: {self.persistent.user_workspace_path}\n"
-                "The following files are available for reference:\n\n"
-                f"{self.persistent.workspace_rag_context}\n"
-            )
-        
-        # Workspace structure
+        # Workspace structure with absolute path
+        workspace_abs_path = self.persistent.workspace_dir.resolve()
         sections.append(
-            "=== WORKSPACE STRUCTURE ===\n"
-            f"Task workspace: {self.persistent.workspace_dir}\n"
+            "=== WORKSPACE (YOUR WORKING DIRECTORY) ===\n"
+            f"Path: {workspace_abs_path}\n"
+            "\n"
+            "**IMPORTANT RULES:**\n"
+            "1. All <write_file path=\"...\"> operations write files HERE (relative to this path)\n"
+            "2. All <read_file> operations read files from HERE\n"
+            "3. All <mkdir> operations create directories HERE\n"
+            "4. All bash/python commands run with this as the working directory\n"
+            "5. You can READ and WRITE any file in this workspace\n"
+            "6. Do NOT access files outside this workspace\n"
+            "\n"
+            "**PATH RULES:**\n"
+            "- Use RELATIVE paths in all file operations (e.g., 'data/config.yaml', NOT absolute paths)\n"
+            "- Example: <write_file path=\"subdir/my_file.py\"> writes to:\n"
+            f"  {workspace_abs_path / 'subdir' / 'my_file.py'}\n"
+            "\n"
+            "Current workspace structure:\n"
             f"{self.persistent.workspace_structure}\n"
         )
         

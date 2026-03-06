@@ -727,8 +727,10 @@ class IdeaAgentCLI:
                                 path = action.content
                             result = file_manager.mkdir(path)
                             if result["success"]:
-                                self.console.print(f"    [green]{result['message']}[/green]")
-                                action_outputs.append(f"[MKDIR OK] {result['message']}")
+                                # Include absolute path in output
+                                abs_path_info = f" (absolute: {result['path']})"
+                                self.console.print(f"    [green]{result['message']}{abs_path_info}[/green]")
+                                action_outputs.append(f"[MKDIR OK] {result['message']}{abs_path_info}")
                             else:
                                 self.console.print(f"    [red]{result['error']}[/red]")
                                 action_outputs.append(f"[MKDIR FAIL] {result['error']}")
@@ -743,8 +745,10 @@ class IdeaAgentCLI:
                             content = action.content
                             result = file_manager.write_file(path, content) 
                             if result["success"]:
-                                self.console.print(f"    [green]{result['message']}[/green]")
-                                action_outputs.append(f"[WRITE_FILE OK] {result['message']} ({result['bytes_written']} bytes)")
+                                # Include absolute path in output - this is critical for LLM to know where file was written
+                                abs_path_info = f" (absolute: {result['absolute_path']})"
+                                self.console.print(f"    [green]{result['message']}{abs_path_info}[/green]")
+                                action_outputs.append(f"[WRITE_FILE OK] {result['relative_path']}{abs_path_info} ({result['bytes_written']} bytes)")
                             else:
                                 self.console.print(f"    [red]{result['error']}[/red]")
                                 action_outputs.append(f"[WRITE_FILE FAIL] {result['error']}")
@@ -754,9 +758,16 @@ class IdeaAgentCLI:
                             path = action.content
                             result = file_manager.read_file(path)
                             if result["success"]:
-                                content_preview = result["content"][:20] + "..." if len(result["content"]) > 200 else result["content"]
-                                self.console.print(f"    [green]Read {path} ({result['bytes_read']} bytes)[/green]")
-                                action_outputs.append(f"[READ_FILE OK] {path}:\n{content_preview}")
+                                # For read_file, show more content since LLM needs to see the full file
+                                content_preview = (
+                                    result["content"][:100000] + "\n... [truncated]"
+                                    if len(result["content"]) > 100000
+                                    else result["content"]
+                                )
+                                # Include absolute path info
+                                abs_path_info = f" (absolute: {result['path']})"
+                                self.console.print(f"    [green]Read {path}{abs_path_info} ({result['bytes_read']} bytes)[/green]")
+                                action_outputs.append(f"[READ_FILE OK] {path}{abs_path_info}:\n{content_preview}")
                             else:
                                 self.console.print(f"    [red]{result['error']}[/red]")
                                 action_outputs.append(f"[READ_FILE FAIL] {result['error']}")
@@ -981,20 +992,19 @@ class IdeaAgentCLI:
 
         logger.info("Starting execution of plan with %d steps", len(plan.steps))
 
-        # Create task workspace - use effective_workspace if provided, otherwise use sandbox default
-        task_name = (
-            state_manager.task.idea_description[:50]
-            if state_manager.task.idea_description
-            else f"task_{state_manager.task.id}"
-        )
-        
-        # When user specifies a workspace, create task workspace inside it
+        # When user specifies a workspace, use it directly as the task workspace
+        # Otherwise, create a new task workspace in sandbox
         if effective_workspace is not None:
-            workspace_dir = self.sandbox.create_task_workspace(task_name, base_dir=effective_workspace)
+            workspace_dir = effective_workspace
+            logger.info("Using user-specified workspace: %s", workspace_dir)
         else:
+            task_name = (
+                state_manager.task.idea_description[:50]
+                if state_manager.task.idea_description
+                else f"task_{state_manager.task.id}"
+            )
             workspace_dir = self.sandbox.create_task_workspace(task_name)
-        
-        logger.info("Created task workspace: %s", workspace_dir)
+            logger.info("Created task workspace: %s", workspace_dir)
 
         # Store research type so the agent-loop helper can access it
         self._current_research_type = state_manager.task.research_type

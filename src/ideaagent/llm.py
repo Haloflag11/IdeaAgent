@@ -440,8 +440,10 @@ class LLMClient:
             Dict with status ("success" or "fix") and optional reason/code
         """
         # Build user prompt for judgment
-        stdout_trunc = stdout[:4000] if len(stdout) > 4000 else stdout
-        stderr_trunc = stderr[:2000] if len(stderr) > 2000 else stderr
+        # NOTE: stdout may contain READ_FILE results (file contents), so we need
+        # a larger truncation limit to ensure LLM can see the full file content.
+        stdout_trunc = stdout[:100000] if len(stdout) > 100000 else stdout
+        stderr_trunc = stderr[:4000] if len(stderr) > 4000 else stderr
         
         user_prompt_parts = [
             f"You are acting as an autonomous agent executor (attempt {attempt}/{max_attempts}).",

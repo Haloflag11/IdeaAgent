@@ -116,7 +116,9 @@ class FileManager:
             return {
                 "success": True,
                 "path": str(file_path),
-                "message": f"Written to file: {path}",
+                "relative_path": path,
+                "absolute_path": str(file_path),
+                "message": f"Written to file: {path} (absolute: {file_path})",
                 "bytes_written": len(content.encode(encoding)),
             }
         except Exception as e:
