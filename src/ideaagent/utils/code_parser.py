@@ -11,6 +11,7 @@ Action types supported
 <python>...</python>        Python code to execute in the workspace
 <read_file>path</read_file> Read a file and return its content
 <write_file path="...">content</write_file>  Write content to a file
+<listing_files>tree</listing_files> - List files in a directory
 <task_complete>msg</task_complete>  Signal that the step is done
 """
 
@@ -94,6 +95,7 @@ class ActionType(Enum):
     MKDIR = "mkdir"         # <mkdir path="..."></mkdir> - create directory
     TASK_COMPLETE = "task_complete"
     THINKING = "thinking"   # <thinking> blocks – log only, don't execute
+    LISTING_FILES = "listing_files"  # <listing_files>tree</listing_files> - list files in a directory
 
 
 @dataclass
@@ -126,6 +128,8 @@ _ACTION_PATTERNS: list[tuple[ActionType, re.Pattern]] = [
          r'<mkdir\s+path=["\']([^"\']+)["\']>\s*</mkdir>',
          re.DOTALL | re.IGNORECASE,
      )),
+    (ActionType.LISTING_FILES,
+     re.compile(r"<listing_files>(.*?)</listing_files>", re.DOTALL | re.IGNORECASE)),
     (ActionType.TASK_COMPLETE,
      re.compile(r"<task_complete>(.*?)</task_complete>", re.DOTALL | re.IGNORECASE)),
     (ActionType.THINKING,
@@ -158,6 +162,8 @@ def parse_agent_actions(text: str) -> list[AgentAction]:
         <python>import pandas as pd ...</python>
         <read_file>data/results.csv</read_file>
         <write_file path="results/summary.md">...</write_file>
+        <mkdir path="results"></mkdir>
+        <listing_files>tree</listing_files>
         <task_complete>All done.</task_complete>
 
     2. **Markdown fenced code blocks** (fallback)::

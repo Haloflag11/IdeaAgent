@@ -773,6 +773,22 @@ class IdeaAgentCLI:
                                 action_outputs.append(f"[READ_FILE FAIL] {result['error']}")
                                 has_failure = True
                                 
+                        elif action.action_type == ActionType.LISTING_FILES:
+                            # List files in workspace using tree-style format
+                            path = action.content.strip() if action.content else "."
+                            from .utils.workspace import get_workspace_structure
+                            try:
+                                # Resolve path relative to workspace
+                                target_path = workspace_dir / path
+                                tree_output = get_workspace_structure(target_path, max_depth=3)
+                                self.console.print(f"    [green]Listed files in {path}[/green]")
+                                action_outputs.append(f"[LISTING_FILES OK] {path}:\n{tree_output}")
+                            except Exception as e:
+                                error_msg = f"Failed to list files: {e}"
+                                self.console.print(f"    [red]{error_msg}[/red]")
+                                action_outputs.append(f"[LISTING_FILES FAIL] {error_msg}")
+        
+                                
                         elif action.action_type == ActionType.BASH:
                             command = action.content
                             self.console.print(f"    [yellow]Running: {command}[/yellow]")
