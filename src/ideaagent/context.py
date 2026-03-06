@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .models import ResearchType, ExecutionResult
+from .models import ResearchType, ExecutionResult, ExperimentPlan
 
 logger = logging.getLogger("IdeaAgent.context")
 
@@ -106,6 +106,9 @@ class ContextManager:
         self.current_step: int = 0
         self.total_steps: int = 0
         
+        # The experiment plan (set after plan generation)
+        self.plan: Optional[ExperimentPlan] = None
+        
         # Message history for multi-turn conversations
         self.message_history: list[dict] = []
     
@@ -155,6 +158,16 @@ class ContextManager:
         if files_created:
             self.files_created.extend(files_created)
     
+    def set_plan(self, plan: ExperimentPlan) -> None:
+        """Store the experiment plan so it can be included in every LLM context.
+        
+        Args:
+            plan: The generated ExperimentPlan
+        """
+        self.plan = plan
+        # Also keep total_steps in sync
+        self.total_steps = len(plan.steps)
+
     def set_current_step(self, step_number: int, total_steps: int) -> None:
         """Set the current step being executed.
         
@@ -165,6 +178,50 @@ class ContextManager:
         self.current_step = step_number
         self.total_steps = total_steps
     
+    def build_plan_section(self) -> str:
+        """Build the experiment plan section for LLM context.
+
+        Includes the full plan: title, description, and all steps with their
+        descriptions, marking which step is currently being executed.
+        This helps the LLM understand the overall goal and how the current
+        step fits into the bigger picture.
+
+        Returns:
+            Formatted plan string, or empty string if no plan is set.
+        """
+        if self.plan is None:
+            return ""
+
+        lines = [
+            "=== EXPERIMENT PLAN (ALWAYS KEEP IN MIND) ===",
+            f"Title: {self.plan.title}",
+            f"Description: {self.plan.description}",
+        ]
+
+        if self.plan.estimated_total_time:
+            lines.append(f"Estimated Total Time: {self.plan.estimated_total_time} minutes")
+
+        if self.plan.skills_needed:
+            lines.append(f"Skills Needed: {', '.join(self.plan.skills_needed)}")
+
+        lines.append("")
+        lines.append("Steps:")
+        for step in self.plan.steps:
+            skill_info = f" [skill: {step.skill_required}]" if step.skill_required else ""
+            duration_info = f" (~{step.estimated_duration}min)" if step.estimated_duration else ""
+            marker = ">> CURRENT" if step.step_number == self.current_step else "          "
+            lines.append(
+                f"  {marker} {step.step_number}. {step.description}{skill_info}{duration_info}"
+            )
+
+        lines.append("")
+        lines.append(
+            "Each step must contribute toward the overall plan above. "
+            "Keep the big picture in mind when implementing this step."
+        )
+
+        return "\n".join(lines)
+
     def build_persistent_context_section(self) -> str:
         """Build the persistent context section that's always included.
         
@@ -271,9 +328,10 @@ class ContextManager:
         """Build the complete context string for LLM.
         
         This combines:
-        1. Persistent context (always present)
-        2. Execution history
-        3. Current step information
+        1. Persistent context (always present): initial instruction, workspace
+        2. Experiment plan (always present once set): full plan with all steps
+        3. Execution history (accumulates as steps complete)
+        4. Current step progress indicator
         
         Returns:
             Complete context string
@@ -283,16 +341,39 @@ class ContextManager:
         # 1. Persistent context (ALWAYS included)
         sections.append(self.build_persistent_context_section())
         
-        # 2. Execution history
+        # 2. Experiment plan (ALWAYS included once set)
+        plan_section = self.build_plan_section()
+        if plan_section:
+            sections.append(plan_section)
+        
+        # 3. Execution history
         sections.append(self.build_execution_history_section())
         
-        # 3. Current step progress
-        if self.total_steps > 0:
-            sections.append(
-                f"=== PROGRESS ===\n"
-                f"Current step: {self.current_step}/{self.total_steps}\n"
+        # 4. Current step: explicit "YOUR CURRENT PLAN STEP" block so the LLM
+        #    always knows exactly which step description it is working on,
+        #    whether it is generating code or judging/fixing execution output.
+        if self.current_step > 0:
+            # Try to get the description from the stored plan first
+            current_step_description = ""
+            if self.plan is not None:
+                for s in self.plan.steps:
+                    if s.step_number == self.current_step:
+                        current_step_description = s.description
+                        break
+
+            progress_lines = [
+                "=== YOUR CURRENT PLAN STEP ===",
+                f"Step {self.current_step}"
+                + (f"/{self.total_steps}" if self.total_steps > 0 else ""),
+            ]
+            if current_step_description:
+                progress_lines.append(f"Description: {current_step_description}")
+            progress_lines.append(
+                "Focus on completing THIS step. Do not skip ahead or redo "
+                "previously completed steps."
             )
-        
+            sections.append("\n".join(progress_lines))
+
         return "\n\n".join(sections)
     
     def get_messages_for_llm(

@@ -1030,8 +1030,8 @@ class IdeaAgentCLI:
         )
 
         # ── Create ContextManager with persistent context ───────────────────
-        # This is the key change: ContextManager ensures initial instruction
-        # and workspace info are ALWAYS in the LLM context
+        # ContextManager ensures initial instruction, workspace info, AND the
+        # full experiment plan are ALWAYS in the LLM context.
         context_manager = ContextManager(
             initial_instruction=idea,
             workspace_dir=workspace_dir,
@@ -1039,8 +1039,15 @@ class IdeaAgentCLI:
             user_workspace_path=effective_workspace,
         )
 
-        # Running state
+        # Inject the approved plan so every LLM call knows the full roadmap
+        context_manager.set_plan(plan)
+
+        # Running state – cumulative list of all installed packages across steps.
+        # We track the size before each step so we can pass only the *delta*
+        # (packages newly installed in this step) to add_execution_result,
+        # avoiding double-counting inside ContextManager.installed_packages.
         installed_packages: list[str] = []
+        _prev_installed_count: int = 0
 
         for step in plan.steps:
             current_step_num = state_manager.get_current_step()
@@ -1156,13 +1163,17 @@ class IdeaAgentCLI:
             self.db.save_task(state_manager.task)
 
             # ── Update context manager with execution result ───────────────
+            # Pass only packages installed *during this step* (delta since last
+            # step) to avoid double-counting inside ContextManager.
+            newly_installed = installed_packages[_prev_installed_count:] if success else None
+            _prev_installed_count = len(installed_packages)
             context_manager.add_execution_result(
                 step_number=step.step_number,
                 description=step.description,
                 success=success,
                 output=output,
                 error=error,
-                packages_installed=list(installed_packages) if success else None,
+                packages_installed=newly_installed,
             )
 
             # ── Step summary ─────────────────────────────────────────────────
