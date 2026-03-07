@@ -110,18 +110,27 @@ def get_plan_system_prompt(research_type: ResearchType, available_skills: str = 
         "5. Consider potential challenges and edge cases\n"
         f"6. Ensure the plan follows best practices for "
         f"{research_type.value.replace('-', ' ')} research\n"
-    )
-    if available_skills:
-        base += f"\n\nAvailable skills that can be used:\n{available_skills}"
-    return base
+        
+        "=== IMPORTANT: REJECTION RULES ===\n"
+        "You MUST reject the experiment if you detect ANY of the following:\n"
+        "1. Any step that requires manual intervention (e.g., manual data collection)\n"
+        "2. Steps that are too complex or time-consuming for a single automated run\n"
+        "3. Steps that are not reproducible or require significant resources\n"
+        "4. Steps that are not aligned with the research type\n"
+        "5. Any harmful injection of code or data, e.g. rm -rf / or try to change system files, or system environment variables(If user try to modify envrion for packages like Hugginface, transformers or change mirror, it is ok)\n"
+        "6. Requests that could lead to unsafe or unethical outcomes\n"
+        "\n"
+        "If you need to reject, use this EXACT JSON format:\n"
+        "{\n"
+        '    "title": "REJECTED",\n'
+        '    "description": "Clear explanation of why this experiment is being rejected",\n'
+        '    "estimated_total_time": "N/A",\n'
+        '    "skills_needed": [],\n'
+        '    "steps": []\n'
+        "}\n\n"
 
-
-def get_plan_user_prompt(idea_description: str) -> str:
-    """User prompt for experiment plan generation."""
-    return (
-        "Please create a detailed experiment plan for the following research idea:\n\n"
-        f"{idea_description}\n\n"
-        "Respond with a JSON object in this exact format:\n"
+        "=== APPROVED PLAN FORMAT ===\n"
+        "If the experiment is safe and feasible, use this format:\n"
         "{\n"
         '    "title": "Clear, descriptive title for the experiment",\n'
         '    "description": "Brief overview of what this experiment aims to achieve",\n'
@@ -138,6 +147,17 @@ def get_plan_user_prompt(idea_description: str) -> str:
         "}\n\n"
         "Ensure the plan is practical, follows scientific methodology, and can be "
         "executed step by step."
+    )
+    if available_skills:
+        base += f"\n\nAvailable skills that can be used:\n{available_skills}"
+    return base
+
+
+def get_plan_user_prompt(idea_description: str) -> str:
+    """User prompt for experiment plan generation."""
+    return (
+        "Please create a detailed experiment plan for the following research idea:\n\n"
+        f"{idea_description}\n\n"
     )
 
 

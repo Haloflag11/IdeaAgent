@@ -325,7 +325,8 @@ class LLMClient:
                 )
             )
         if not steps:
-            raise ValueError("No valid steps in plan")
+            if (plan_data["title"].lower() != 'rejected'):
+                raise ValueError("No valid steps in plan")
 
         return ExperimentPlan(
             title=plan_data["title"],

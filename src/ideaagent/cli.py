@@ -1357,6 +1357,30 @@ class IdeaAgentCLI:
             state_manager.set_plan(plan)
             self.db.save_task(task)
 
+            # ── Check for auto-rejected plan ─────────────────────────────────
+            # If the LLM rejected the plan (title contains "rejected"), 
+            # display the reason and end the task immediately
+            if "rejected" in plan.title.lower():
+                self.console.print("\n[bold red]⚠ Plan Auto-Rejected by LLM[/bold red]")
+                self.console.print(
+                    Panel(
+                        f"[yellow]Reason:[/yellow] {plan.description}",
+                        border_style="red",
+                    )
+                )
+                logger.info(
+                    "Plan rejected by LLM during generation: %s", plan.description
+                )
+                
+                # Update task status to rejected
+                state_manager.reject_plan("LLM rejected the plan during generation: " + plan.description)
+                self.db.save_task(task)
+                
+                self.console.print(
+                    "\n[bold red]Task terminated due to safety/reproducibility concerns.[/bold red]"
+                )
+                return  # Exit run_task_interactive immediately
+
             # ── Show plan ────────────────────────────────────────────────────
             self.console.print("\n[bold]Generated Experiment Plan:[/bold]")
             self.console.print(
@@ -1385,7 +1409,7 @@ class IdeaAgentCLI:
             approved = Confirm.ask(
                 "[bold]Do you want to proceed with this plan?[/bold]"
             )
-
+            
             if approved:
                 state_manager.approve_plan()
                 state_manager.start_execution()
@@ -1407,6 +1431,9 @@ class IdeaAgentCLI:
                 regeneration_attempt = 0
                 
                 while regeneration_attempt < max_regeneration_attempts:
+                    state_manager.start_planning()
+                    self.db.save_task(task)
+                    
                     regeneration_attempt += 1
                     
                     self.console.print(
