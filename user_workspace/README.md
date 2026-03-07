@@ -9,7 +9,7 @@ contents as **AgenticRAG context** into its planning and execution prompts.
 
 ## How It Works
 
-1. Put your data files, notebooks, scripts, CSVs, JSON configs, text notes, etc.
+1. Put your data files, notebooks(Not supported yet), scripts, CSVs, JSON configs, text notes, etc.
    into this folder (or any folder you choose).
 2. Run IdeaAgent and specify the workspace path:
    ```
@@ -22,6 +22,7 @@ contents as **AgenticRAG context** into its planning and execution prompts.
    - Read and summarise their content.
    - Inject that knowledge into the **plan generation** and **each execution step**
      so the Agent can refer to your existing data, code, and notes.
+4. You can also just put your folder in the project root folder.
 
 ## Supported File Types
 
