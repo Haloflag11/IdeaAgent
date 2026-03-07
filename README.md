@@ -297,7 +297,7 @@ IdeaAgent validate ./skills/my-skill
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/image?repos=Haloflag11/IdeaAgent.git&type=date&legend=top-left)](https://www.star-history.com/?repos=Haloflag11%2FIdeaAgent.git&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/image?repos=Haloflag11/IdeaAgent&type=date&legend=top-left)](https://www.star-history.com/?repos=Haloflag11%2FIdeaAgent&type=date&legend=top-left)
 
 ## License
 
